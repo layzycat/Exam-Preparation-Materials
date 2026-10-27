@@ -1,0 +1,14 @@
+services:
+  istqb:
+    build: .
+    container_name: istqb
+    restart: always
+    ports:
+      - "3030:3030"
+    networks:
+      - bot_debits_default
+
+networks:
+  bot_debits_default:
+    external: true
+
