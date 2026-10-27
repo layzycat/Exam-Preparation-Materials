@@ -6,9 +6,8 @@ services:
     ports:
       - "3030:3030"
     networks:
-      - bot_debits_default
+      - default
 
 networks:
-  bot_debits_default:
-    external: true
-
+  default:
+    name: bot_debits_default
