@@ -14,10 +14,12 @@ export interface Question {
   question: string;
   questionVi?: string;
   images: string[];
+  imagesVi?: string[];
   options: Record<OptionKey, string>;
   optionsVi?: Record<OptionKey, string>;
   correctAnswer: OptionKey;
   explanation: string;
+  explanationShort?: string;
   knowledge: string;
   chapter: number;
   chapterTitle: string;
@@ -29,6 +31,8 @@ export interface Exam {
   shortTitle: string;
   pdfFileName: string;
   pdfUrl: string;
+  pdfViFileName?: string;
+  pdfViUrl?: string;
   questionCount: number;
   regularCount: number;
   supplementaryCount: number;
@@ -49,6 +53,7 @@ export interface ExamsDataset {
     totalExams: number;
     totalQuestions: number;
     totalImages: number;
+    totalViImages?: number;
     standardQuestionCount: number;
     passPercentage: number;
     passScoreOn40: number;

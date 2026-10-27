@@ -20,36 +20,147 @@ CHAPTER_TITLES = {
 def clean_text(s: str) -> str:
     s = html.unescape(s)
     s = unicodedata.normalize("NFC", s)
-    # Collapse multiple spaces/newlines into single space
     s = re.sub(r"\s+", " ", s).strip()
     return s
+
+def parse_vietnamese_pdf(vi_pdf_path: str, exam_num: int, img_vi_out_dir: str):
+    doc = fitz.open(vi_pdf_path)
+    questions_vi = []
+    curr_q = None
+
+    for pno, page in enumerate(doc):
+        d = page.get_text("dict")
+        blocks = [b for b in d["blocks"] if b["type"] == 0 and b["bbox"][1] < 795]
+        blocks = sorted(blocks, key=lambda b: (round(b["bbox"][1], 1), round(b["bbox"][0], 1)))
+
+        skip_bboxes = set()
+        fig_crops = {}
+        for idx, b in enumerate(blocks):
+            txt = unicodedata.normalize(
+                "NFC",
+                " ".join("".join(s["text"] for s in l["spans"]) for l in b["lines"]).strip(),
+            )
+            m_head = re.match(r"^(Câu(?:\s+bổ\s+sung)?\s+\d+[b]?)\.\s*(.*)$", txt, re.S)
+            if m_head:
+                y_q_end = b["bbox"][3]
+                for j in range(idx + 1, len(blocks)):
+                    nb = blocks[j]
+                    ntxt = unicodedata.normalize(
+                        "NFC",
+                        " ".join("".join(s["text"] for s in l["spans"]) for l in nb["lines"]).strip(),
+                    )
+                    if re.match(r"^a\)\s", ntxt):
+                        y_a_start = nb["bbox"][1]
+                        if (y_a_start - y_q_end) > 20:
+                            for k in range(idx + 1, j):
+                                skip_bboxes.add(k)
+                            fig_crops[idx] = (pno, fitz.Rect(52, y_q_end + 3, 543, y_a_start - 3))
+                        break
+
+        for idx, b in enumerate(blocks):
+            if idx in skip_bboxes:
+                continue
+            txt = unicodedata.normalize(
+                "NFC",
+                " ".join("".join(s["text"] for s in l["spans"]) for l in b["lines"]).strip(),
+            )
+            if not txt:
+                continue
+            if pno == 0 and curr_q is None and not re.match(r"^Câu\b", txt):
+                continue
+            if re.match(r"^PHẦN BỔ SUNG", txt, re.I):
+                if curr_q:
+                    questions_vi.append(curr_q)
+                    curr_q = None
+                continue
+            if curr_q is None and not re.match(r"^Câu\b", txt):
+                continue
+
+            m_head = re.match(r"^(Câu(?:\s+bổ\s+sung)?\s+\d+[b]?)\.\s*(.*)$", txt, re.S)
+            if m_head:
+                if curr_q:
+                    questions_vi.append(curr_q)
+                curr_q = {
+                    "label": m_head.group(1),
+                    "stem": m_head.group(2).strip(),
+                    "blocks": [],
+                    "fig_crop": fig_crops.get(idx),
+                }
+            else:
+                if curr_q is not None:
+                    curr_q["blocks"].append(txt)
+
+    if curr_q:
+        questions_vi.append(curr_q)
+
+    parsed_list = []
+    for q_idx, rq in enumerate(questions_vi, 1):
+        body = "\n".join(rq["blocks"])
+        m = re.search(
+            r"^a\)\s*(.*?)\nb\)\s*(.*?)\nc\)\s*(.*?)\nd\)\s*(.*?)\nĐáp án:\s*([a-dA-D])\s*(?:Giải thích:\s*(.*))?$",
+            body,
+            re.S,
+        )
+        if not m:
+            raise ValueError(f"Failed to parse Vietnamese PDF Exam {exam_num} {rq['label']}")
+        opt_a, opt_b, opt_c, opt_d, ans, short_expl = m.groups()
+
+        images_vi = []
+        if rq["fig_crop"]:
+            crop_pno, crop_rect = rq["fig_crop"]
+            pix = doc[crop_pno].get_pixmap(clip=crop_rect, dpi=200)
+            vi_img_name = f"exam-{exam_num}-q-{q_idx}-vi.png"
+            vi_img_path = os.path.join(img_vi_out_dir, vi_img_name)
+            pix.save(vi_img_path)
+            images_vi.append(f"/images/questions-vi/{vi_img_name}")
+
+        parsed_list.append({
+            "questionVi": clean_text(rq["stem"]),
+            "optionsVi": {
+                "a": clean_text(opt_a),
+                "b": clean_text(opt_b),
+                "c": clean_text(opt_c),
+                "d": clean_text(opt_d),
+            },
+            "answerVi": ans.lower().strip(),
+            "explanationShortVi": clean_text(short_expl or ""),
+            "imagesVi": images_vi,
+        })
+
+    return parsed_list
 
 def main():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     pdf_dir = os.path.join(base_dir, "IETLS")
     img_out_dir = os.path.join(base_dir, "public", "images", "questions")
+    img_vi_out_dir = os.path.join(base_dir, "public", "images", "questions-vi")
     pdf_out_dir = os.path.join(base_dir, "public", "pdfs")
     data_out_dir = os.path.join(base_dir, "src", "data")
     os.makedirs(img_out_dir, exist_ok=True)
+    os.makedirs(img_vi_out_dir, exist_ok=True)
     os.makedirs(pdf_out_dir, exist_ok=True)
     os.makedirs(data_out_dir, exist_ok=True)
 
-    pdf_files = sorted(
-        glob.glob(os.path.join(pdf_dir, "*.pdf")),
+    en_pdf_files = sorted(
+        [
+            f for f in glob.glob(os.path.join(pdf_dir, "*.pdf"))
+            if not os.path.basename(f).startswith("De")
+        ],
         key=lambda x: int(re.search(r"(\d+)\.pdf$", unicodedata.normalize("NFC", x)).group(1))
     )
-
-    translations_path = os.path.join(data_out_dir, "translationsVi.json")
-    translations_vi = {}
-    if os.path.exists(translations_path):
-        with open(translations_path, "r", encoding="utf-8") as f_tr:
-            translations_vi = json.load(f_tr)
 
     exams = []
     all_questions = []
     total_images = 0
+    total_vi_images = 0
 
-    for exam_num, pdf_path in enumerate(pdf_files, 1):
+    for exam_num, pdf_path in enumerate(en_pdf_files, 1):
+        vi_pdf_path = os.path.join(pdf_dir, f"De{exam_num}_ISTQB_CTFL_tieng_Viet.pdf")
+        if not os.path.exists(vi_pdf_path):
+            raise FileNotFoundError(f"Missing Vietnamese PDF: {vi_pdf_path}")
+
+        vi_parsed = parse_vietnamese_pdf(vi_pdf_path, exam_num, img_vi_out_dir)
+
         doc = fitz.open(pdf_path)
         stream = []
         for pno, page in enumerate(doc):
@@ -105,10 +216,14 @@ def main():
         if curr_q:
             raw_questions.append(curr_q)
 
+        assert len(raw_questions) == len(vi_parsed), (
+            f"Count mismatch in Exam {exam_num}: EN={len(raw_questions)}, VI={len(vi_parsed)}"
+        )
+
         exam_questions = []
         seen_labels = set()
 
-        for q_idx, rq in enumerate(raw_questions, 1):
+        for q_idx, (rq, vq) in enumerate(zip(raw_questions, vi_parsed), 1):
             text = "\n".join(rq["lines"])
             m = re.search(
                 r"^(.*?)\na\)\s*(.*?)\nb\)\s*(.*?)\nc\)\s*(.*?)\nd\)\s*(.*?)\nĐáp án:\s*([a-dA-D])\b\s*\nGiải thích:\s*(.*?)(?:\nKiến thức:\s*(.*))?$",
@@ -126,7 +241,7 @@ def main():
 
             label = rq["label"]
             if label in seen_labels and label == "Câu 23":
-                display_label = "Câu 24"
+                display_label = "Câu 23b"
             else:
                 display_label = label
             seen_labels.add(label)
@@ -141,9 +256,9 @@ def main():
                 image_urls.append(f"/images/questions/{img_filename}")
                 total_images += 1
 
-            q_id = f"e{exam_num}_q{q_idx}"
-            tr = translations_vi.get(q_id, {})
+            total_vi_images += len(vq["imagesVi"])
 
+            q_id = f"e{exam_num}_q{q_idx}"
             q_obj = {
                 "id": q_id,
                 "examId": exam_num,
@@ -154,17 +269,19 @@ def main():
                 "isSupplementary": rq["is_supp"],
                 "isV4": is_v4,
                 "question": clean_text(stem),
-                "questionVi": tr.get("questionVi", ""),
+                "questionVi": vq["questionVi"],
                 "images": image_urls,
+                "imagesVi": vq["imagesVi"],
                 "options": {
                     "a": clean_text(opt_a),
                     "b": clean_text(opt_b),
                     "c": clean_text(opt_c),
                     "d": clean_text(opt_d),
                 },
-                "optionsVi": tr.get("optionsVi", {}),
+                "optionsVi": vq["optionsVi"],
                 "correctAnswer": ans.lower().strip(),
                 "explanation": clean_text(expl),
+                "explanationShort": vq["explanationShortVi"],
                 "knowledge": know_clean,
                 "chapter": chapter_num,
                 "chapterTitle": CHAPTER_TITLES.get(chapter_num, f"Chương {chapter_num}"),
@@ -175,12 +292,17 @@ def main():
         pdf_dest = os.path.join(pdf_out_dir, f"de-{exam_num}.pdf")
         shutil.copy2(pdf_path, pdf_dest)
 
+        pdf_vi_dest = os.path.join(pdf_out_dir, f"de-{exam_num}-vi.pdf")
+        shutil.copy2(vi_pdf_path, pdf_vi_dest)
+
         exams.append({
             "id": exam_num,
             "title": f"Đề thi thử ISTQB CTFL – Đề {exam_num}",
             "shortTitle": f"Đề {exam_num}",
             "pdfFileName": unicodedata.normalize("NFC", os.path.basename(pdf_path)),
             "pdfUrl": f"/pdfs/de-{exam_num}.pdf",
+            "pdfViFileName": os.path.basename(vi_pdf_path),
+            "pdfViUrl": f"/pdfs/de-{exam_num}-vi.pdf",
             "questionCount": len(exam_questions),
             "regularCount": sum(1 for q in exam_questions if not q["isSupplementary"]),
             "supplementaryCount": sum(1 for q in exam_questions if q["isSupplementary"]),
@@ -195,6 +317,7 @@ def main():
             "totalExams": len(exams),
             "totalQuestions": len(all_questions),
             "totalImages": total_images,
+            "totalViImages": total_vi_images,
             "standardQuestionCount": 40,
             "passPercentage": 65,
             "passScoreOn40": 26,
@@ -215,7 +338,10 @@ def main():
     with open(out_file, "w", encoding="utf-8") as f_out:
         json.dump(payload, f_out, ensure_ascii=False, indent=2)
 
-    print(f"Successfully extracted {len(exams)} exams, {len(all_questions)} questions, {total_images} images to {out_file}")
+    print(
+        f"Successfully extracted {len(exams)} exams, {len(all_questions)} questions, "
+        f"{total_images} EN images, {total_vi_images} VI images to {out_file}"
+    )
 
 if __name__ == "__main__":
     main()

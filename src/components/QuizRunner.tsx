@@ -364,28 +364,66 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                 </div>
 
                 {/* Question Figures / Diagrams */}
-                {currentQ.images.length > 0 && (
+                {(currentQ.images.length > 0 || (currentQ.imagesVi && currentQ.imagesVi.length > 0)) && (
                   <div className="space-y-3">
-                    {currentQ.images.map((imgSrc, idx) => (
-                      <div
-                        key={idx}
-                        className="relative group bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col items-center"
-                      >
-                        <img
-                          src={imgSrc}
-                          alt={`Hình minh họa câu ${currentIndex + 1}`}
-                          onClick={() => setZoomedImage(imgSrc)}
-                          className="max-h-96 w-auto object-contain rounded-lg cursor-zoom-in mx-auto"
-                        />
-                        <button
-                          onClick={() => setZoomedImage(imgSrc)}
-                          className="mt-2 inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-600 font-medium cursor-pointer"
+                    {(languageMode === 'en' || languageMode === 'bilingual') &&
+                      currentQ.images.map((imgSrc, idx) => (
+                        <div
+                          key={`en-${idx}`}
+                          className="relative group bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col items-center"
                         >
-                          <ZoomIn className="w-3.5 h-3.5" />
-                          Nhấn vào hình để phóng to
-                        </button>
-                      </div>
-                    ))}
+                          {languageMode === 'bilingual' && (
+                            <span className="self-start text-[11px] font-bold uppercase text-slate-500 mb-1.5">
+                              Hình gốc tiếng Anh (EN):
+                            </span>
+                          )}
+                          <img
+                            src={imgSrc}
+                            alt={`Hình minh họa câu ${currentIndex + 1} (EN)`}
+                            onClick={() => setZoomedImage(imgSrc)}
+                            className="max-h-96 w-auto object-contain rounded-lg cursor-zoom-in mx-auto"
+                          />
+                          <button
+                            onClick={() => setZoomedImage(imgSrc)}
+                            className="mt-2 inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-600 font-medium cursor-pointer"
+                          >
+                            <ZoomIn className="w-3.5 h-3.5" />
+                            Nhấn vào hình để phóng to
+                          </button>
+                        </div>
+                      ))}
+
+                    {(languageMode === 'vi' || languageMode === 'bilingual') &&
+                      (currentQ.imagesVi && currentQ.imagesVi.length > 0
+                        ? currentQ.imagesVi
+                        : languageMode === 'vi'
+                        ? currentQ.images
+                        : []
+                      ).map((imgSrc, idx) => (
+                        <div
+                          key={`vi-${idx}`}
+                          className="relative group bg-indigo-50/40 border border-indigo-200 rounded-xl p-3 flex flex-col items-center"
+                        >
+                          {languageMode === 'bilingual' && (
+                            <span className="self-start text-[11px] font-bold uppercase text-indigo-700 mb-1.5">
+                              Hình bản dịch tiếng Việt (VI):
+                            </span>
+                          )}
+                          <img
+                            src={imgSrc}
+                            alt={`Hình minh họa câu ${currentIndex + 1} (VI)`}
+                            onClick={() => setZoomedImage(imgSrc)}
+                            className="max-h-96 w-auto object-contain rounded-lg cursor-zoom-in mx-auto"
+                          />
+                          <button
+                            onClick={() => setZoomedImage(imgSrc)}
+                            className="mt-2 inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
+                          >
+                            <ZoomIn className="w-3.5 h-3.5" />
+                            Nhấn vào hình để phóng to
+                          </button>
+                        </div>
+                      ))}
                   </div>
                 )}
 
@@ -494,6 +532,13 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                         )}
                       </div>
                     </div>
+
+                    {currentQ.explanationShort && (
+                      <div className="text-sm sm:text-base text-indigo-950 bg-white/80 border border-indigo-200/80 rounded-xl px-3.5 py-2.5 leading-relaxed">
+                        <span className="font-bold text-indigo-700">Tóm tắt nhanh: </span>
+                        {currentQ.explanationShort}
+                      </div>
+                    )}
 
                     <div className="text-sm sm:text-base text-slate-800 leading-relaxed">
                       <span className="font-bold text-indigo-950">Giải thích chi tiết: </span>

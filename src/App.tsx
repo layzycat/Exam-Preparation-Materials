@@ -664,15 +664,30 @@ export function App() {
                           </button>
                         </div>
 
-                        <a
-                          href={exam.pdfUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          title={`Mở file gốc: ${exam.pdfFileName}`}
-                          className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition"
-                        >
-                          <FileText className="w-4 h-4" />
-                        </a>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {exam.pdfViUrl && (
+                            <a
+                              href={exam.pdfViUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={`Mở PDF bản dịch tiếng Việt: ${exam.pdfViFileName}`}
+                              className="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>PDF VI</span>
+                            </a>
+                          )}
+                          <a
+                            href={exam.pdfUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={`Mở PDF gốc: ${exam.pdfFileName}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 font-semibold text-xs transition"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>PDF EN</span>
+                          </a>
+                        </div>
                       </div>
                     </div>
                   );

@@ -273,28 +273,66 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
                     )}
                   </div>
 
-                  {q.images.length > 0 && (
+                  {(q.images.length > 0 || (q.imagesVi && q.imagesVi.length > 0)) && (
                     <div className="space-y-2">
-                      {q.images.map((imgSrc, i) => (
-                        <div
-                          key={i}
-                          className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col items-center"
-                        >
-                          <img
-                            src={imgSrc}
-                            alt={q.label}
-                            onClick={() => setZoomedImage(imgSrc)}
-                            className="max-h-80 w-auto object-contain rounded-lg cursor-zoom-in"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setZoomedImage(imgSrc)}
-                            className="mt-1.5 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-600 cursor-pointer"
+                      {(languageMode === 'en' || languageMode === 'bilingual') &&
+                        q.images.map((imgSrc, i) => (
+                          <div
+                            key={`en-${i}`}
+                            className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col items-center"
                           >
-                            <ZoomIn className="w-3.5 h-3.5" /> Phóng to
-                          </button>
-                        </div>
-                      ))}
+                            {languageMode === 'bilingual' && (
+                              <span className="self-start text-[11px] font-bold uppercase text-slate-500 mb-1">
+                                Hình gốc tiếng Anh (EN):
+                              </span>
+                            )}
+                            <img
+                              src={imgSrc}
+                              alt={`${q.label} (EN)`}
+                              onClick={() => setZoomedImage(imgSrc)}
+                              className="max-h-80 w-auto object-contain rounded-lg cursor-zoom-in"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setZoomedImage(imgSrc)}
+                              className="mt-1.5 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-600 cursor-pointer"
+                            >
+                              <ZoomIn className="w-3.5 h-3.5" /> Phóng to
+                            </button>
+                          </div>
+                        ))}
+
+                      {(languageMode === 'vi' || languageMode === 'bilingual') &&
+                        (q.imagesVi && q.imagesVi.length > 0
+                          ? q.imagesVi
+                          : languageMode === 'vi'
+                          ? q.images
+                          : []
+                        ).map((imgSrc, i) => (
+                          <div
+                            key={`vi-${i}`}
+                            className="bg-indigo-50/40 border border-indigo-200 rounded-xl p-3 flex flex-col items-center"
+                          >
+                            {languageMode === 'bilingual' && (
+                              <span className="self-start text-[11px] font-bold uppercase text-indigo-700 mb-1">
+                                Hình bản dịch tiếng Việt (VI):
+                              </span>
+                            )}
+                            <img
+                              src={imgSrc}
+                              alt={`${q.label} (VI)`}
+                              onClick={() => setZoomedImage(imgSrc)}
+                              className="max-h-80 w-auto object-contain rounded-lg cursor-zoom-in"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setZoomedImage(imgSrc)}
+                              className="mt-1.5 inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                            >
+                              <ZoomIn className="w-3.5 h-3.5" /> Phóng to
+                            </button>
+                          </div>
+                        ))}
                     </div>
                   )}
 
@@ -348,8 +386,14 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
 
                   {isShown && (
                     <div className="rounded-xl bg-indigo-50/60 border border-indigo-200 p-4 space-y-2 text-sm text-slate-800 leading-relaxed">
+                      {q.explanationShort && (
+                        <div className="bg-white/80 border border-indigo-200/80 rounded-lg px-3 py-2 text-indigo-950">
+                          <strong className="text-indigo-700">Tóm tắt nhanh: </strong>
+                          {q.explanationShort}
+                        </div>
+                      )}
                       <div>
-                        <strong className="text-indigo-950">Giải thích: </strong>
+                        <strong className="text-indigo-950">Giải thích chi tiết: </strong>
                         {q.explanation}
                       </div>
                       {q.knowledge && (
